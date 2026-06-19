@@ -159,11 +159,3 @@ Drop any of them into the dashboard to see the full flow.
 - About 10 MB of free disk space for sample data
 
 ---
-
-## 💡 Resume Bullets
-
-> Built a **smart ETL pipeline** in Python (stdlib only) with a 4-step interactive workflow (Upload → Analyze → Configure → Clean) that auto-detects 8 types of data quality issues per column, classifies sensitivity (PII / Financial / Public / Internal), and lets the user pick exactly how each issue gets resolved before applying changes — processed 50,000 rows end-to-end in under 3 seconds.
-
-> Designed a **rule-based cleaning engine** supporting fill-with-mean/median/mode, IQR outlier capping, date format standardisation, case normalisation, and email validation — with per-column user-selectable rules and a before/after dashboard showing every transformation applied.
-
-> Implemented a **lightweight HTTP API server** (Python `http.server`, no Flask/FastAPI) serving a single-page dashboard with drag-and-drop CSV upload, real-time analysis, and direct downloadable cleaned files — entirely self-hosted, zero external dependencies.
