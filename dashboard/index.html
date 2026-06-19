@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adaptive Data Cleaner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f3f5fc;--surface:#ffffff;--card:#ffffff;--card2:#f1f4fd;--border:#e2e7f7;
+  --border2:#cdd7f3;--text:#1c2340;--muted:#5b6386;
+  --blue:#3d63fb;--blue2:#8b3df0;--green:#10b981;--amber:#f59e0b;
+  --red:#ef4444;--teal:#0aa6c2;--purple:#a855f7;
+  --mono:'JetBrains Mono','Consolas',monospace;
+  --sans:'Space Grotesk','Segoe UI',system-ui,sans-serif;
+  --glow-blue:0 0 24px rgba(61,99,251,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);
+  min-height:100vh;font-size:14px;position:relative;overflow-x:hidden}
+
+/* Techy background: grid + glow orbs, fixed behind everything */
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(61,99,251,.07) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(61,99,251,.07) 1px,transparent 1px);
+  background-size:42px 42px;
+  -webkit-mask-image:radial-gradient(ellipse 75% 55% at 50% 0%,black 35%,transparent 90%);
+  mask-image:radial-gradient(ellipse 75% 55% at 50% 0%,black 35%,transparent 90%)}
+.bg-glow{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg-glow::before,.bg-glow::after{content:'';position:absolute;width:520px;height:520px;
+  border-radius:50%;filter:blur(110px);animation:orbDrift 14s ease-in-out infinite alternate;opacity:.55}
+.bg-glow::before{top:-180px;left:-120px;background:radial-gradient(circle,rgba(61,99,251,.35),transparent 70%)}
+.bg-glow::after{bottom:-200px;right:-140px;background:radial-gradient(circle,rgba(168,85,247,.30),transparent 70%);
+  animation-delay:3s}
+@keyframes orbDrift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.12)}}
+
+.hdr,.stepper,.main{position:relative;z-index:1}
+
+/* Header */
+.hdr{background:rgba(255,255,255,.78);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);
+  padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;box-shadow:0 1px 0 rgba(61,99,251,.06)}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:32px;height:32px;background:linear-gradient(135deg,var(--blue),var(--blue2));
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;
+  box-shadow:var(--glow-blue);animation:logoPulse 3s ease-in-out infinite}
+@keyframes logoPulse{0%,100%{box-shadow:0 0 14px rgba(61,99,251,.30)}50%{box-shadow:0 0 26px rgba(139,61,240,.45)}}
+.brand h1{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase}
+.brand p{font-size:10px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
+.brand p::after{content:'_';animation:blink 1.1s step-end infinite;color:var(--teal)}
+@keyframes blink{50%{opacity:0}}
+.spill{display:flex;align-items:center;gap:8px;font-size:11px;font-family:var(--mono);
+  background:var(--card);border:1px solid var(--border2);padding:6px 14px;border-radius:3px;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--red);position:relative}
+.sdot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.sdot.on::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--green);
+  animation:radarPing 1.6s ease-out infinite}
+@keyframes radarPing{0%{transform:scale(.4);opacity:.9}100%{transform:scale(2.2);opacity:0}}
+
+/* Stepper */
+.stepper{background:rgba(255,255,255,.6);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);
+  padding:16px 28px;display:flex;justify-content:center;gap:24px}
+.stp{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted);cursor:default;
+  font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px}
+.stp .num{width:26px;height:26px;background:var(--card);border:1px solid var(--border2);
+  clip-path:polygon(30% 0,100% 0,100% 70%,70% 100%,0 100%,0 30%);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;
+  font-family:var(--mono);transition:.3s}
+.stp.active{color:var(--text)}
+.stp.active .num{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:var(--glow-blue)}
+.stp.done{color:var(--green)}
+.stp.done .num{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 0 16px rgba(16,185,129,.35)}
+.stp-sep{color:var(--border2);align-self:center;font-family:var(--mono)}
+
+/* Layout */
+.main{max-width:1500px;margin:0 auto;padding:24px 28px}
+.page{display:none}.page.active{display:block;animation:fadeUp .35s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── STEP 1: UPLOAD ── */
+.up-hero{text-align:center;padding:40px 0 32px}
+.up-hero h2{font-size:32px;font-weight:700;letter-spacing:-1px;margin-bottom:10px;
+  background:linear-gradient(135deg,var(--text),var(--blue) 55%,var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:0 0 30px rgba(61,99,251,.12)}
+.up-hero p{color:var(--muted);max-width:540px;margin:0 auto;line-height:1.6;font-family:var(--mono);font-size:12.5px}
+.dz{border:2px dashed var(--border2);border-radius:4px;
+  clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px);
+  padding:56px 40px;text-align:center;cursor:pointer;transition:.25s;
+  background:linear-gradient(165deg,var(--card2),var(--surface));position:relative;max-width:600px;margin:0 auto;
+  overflow:hidden}
+.dz::before{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(61,99,251,.10),transparent);
+  transform:skewX(-15deg);animation:dzSheen 4s linear infinite}
+@keyframes dzSheen{0%{left:-60%}100%{left:130%}}
+.dz:hover,.dz.over{border-color:var(--blue);box-shadow:0 0 50px rgba(61,99,251,.15),inset 0 0 30px rgba(61,99,251,.05)}
+.dz input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.dz-icon{font-size:48px;display:block;margin-bottom:16px;animation:float 3s ease-in-out infinite;
+  filter:drop-shadow(0 0 14px rgba(61,99,251,.35))}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.dz-title{font-size:17px;font-weight:600;margin-bottom:7px}
+.dz-sub{color:var(--muted);font-size:12px;line-height:1.5;font-family:var(--mono)}
+.dz-sub b{color:var(--blue)}
+.browse-btn{margin-top:24px;background:linear-gradient(135deg,var(--blue),var(--blue2));
+  border:none;color:#fff;font-size:12px;font-weight:700;padding:12px 30px;cursor:pointer;
+  font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  box-shadow:var(--glow-blue);transition:.2s}
+.browse-btn:hover{box-shadow:0 0 30px rgba(139,61,240,.45);transform:translateY(-1px)}
+
+.notice{background:linear-gradient(165deg,var(--card2),var(--surface));border:1px solid var(--border2);
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
+  padding:18px 22px;max-width:600px;margin:0 auto 24px;text-align:center}
+.notice h3{font-size:14px;color:var(--amber);margin-bottom:8px;font-family:var(--mono)}
+.notice code{background:#13182e;border:1px solid var(--border);border-radius:6px;
+  padding:8px 14px;font-family:var(--mono);font-size:12px;color:#5eead4;
+  display:block;margin:10px 0;text-align:left}
+
+/* Feature chips */
+.feature-chips{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin:0 auto 28px;max-width:680px}
+.chip{background:linear-gradient(165deg,var(--card2),var(--card));border:1px solid var(--border2);
+  color:var(--green);font-size:11px;font-weight:600;padding:7px 14px;border-radius:20px;
+  font-family:var(--mono)}
+
+/* Trust strip */
+.trust-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:980px;
+  margin:36px auto 0}
+.trust-card{background:linear-gradient(165deg,var(--card2),var(--card));border:1px solid var(--border);
+  border-radius:10px;padding:18px 14px;text-align:center;transition:.25s}
+.trust-card:hover{border-color:var(--border2);box-shadow:0 10px 30px rgba(31,41,75,.10);transform:translateY(-2px)}
+.trust-num{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--blue);letter-spacing:-.5px}
+.trust-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:6px}
+
+/* Info sections (What It Does / How It Works) */
+.info-section{margin-top:56px}
+.info-hdr{text-align:center;max-width:620px;margin:0 auto 28px}
+.info-tag{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--blue);
+  text-transform:uppercase;letter-spacing:1px;background:#3d63fb1c;border:1px solid #3d63fb40;
+  border-radius:20px;padding:4px 12px;margin-bottom:12px}
+.info-hdr h3{font-size:22px;font-weight:700;letter-spacing:-.4px;margin-bottom:8px}
+.info-hdr p{color:var(--muted);font-size:13px;line-height:1.6}
+
+.feature-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:980px;margin:0 auto}
+.feature-card{background:linear-gradient(165deg,var(--card2),var(--card));border:1px solid var(--border);
+  border-radius:12px;padding:20px;transition:.25s}
+.feature-card:hover{border-color:var(--blue);box-shadow:0 10px 30px rgba(31,41,75,.10);transform:translateY(-2px)}
+.feature-icon{font-size:24px;margin-bottom:10px}
+.feature-card h4{font-size:14px;font-weight:600;margin-bottom:6px}
+.feature-card p{font-size:12px;color:var(--muted);line-height:1.6}
+
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:980px;margin:0 auto}
+.step-card{background:linear-gradient(165deg,var(--card2),var(--card));border:1px solid var(--border);
+  border-radius:12px;padding:22px 20px;position:relative;transition:.25s}
+.step-card:hover{border-color:var(--blue);box-shadow:0 10px 30px rgba(31,41,75,.10);transform:translateY(-2px)}
+.step-num{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--blue);opacity:.5;margin-bottom:8px}
+.step-card h4{font-size:14px;font-weight:600;margin-bottom:6px}
+.step-card p{font-size:12px;color:var(--muted);line-height:1.6}
+
+@media (max-width:860px){
+  .trust-grid{grid-template-columns:repeat(2,1fr)}
+  .feature-grid,.steps-grid{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:repeat(3,1fr)}
+}
+
+/* ── STEP 2: ANALYSIS ── */
+.analyzing{text-align:center;padding:80px 0}
+.spinner{width:50px;height:50px;border:3px solid var(--border);border-top-color:var(--blue);
+  border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-top:8px}
+.section-hdr h2{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.section-hdr h2::before{content:'// ';color:var(--blue);font-family:var(--mono);font-weight:400;opacity:.7}
+.section-hdr p{font-size:11px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.section-actions{display:flex;gap:8px}
+.btn{background:linear-gradient(165deg,var(--card2),var(--card));border:1px solid var(--border2);color:var(--text);
+  padding:9px 16px;font-size:11px;cursor:pointer;font-family:var(--mono);text-transform:uppercase;
+  letter-spacing:.4px;transition:.2s;
+  clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+.btn:hover{border-color:var(--blue);color:var(--blue);box-shadow:0 0 18px rgba(61,99,251,.18);transform:translateY(-1px)}
+.btn-primary{background:linear-gradient(135deg,var(--blue),var(--blue2));border:none;color:#fff;font-weight:700;
+  box-shadow:var(--glow-blue)}
+.btn-primary:hover{box-shadow:0 0 30px rgba(139,61,240,.45);color:#fff;transform:translateY(-1px)}
+.btn-primary[disabled]{opacity:.4;cursor:not-allowed;box-shadow:none}
+
+/* Health card */
+.health-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:24px;display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;
+  margin-bottom:20px}
+.health-circle{position:relative;width:120px;height:120px}
+.health-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.health-num .v{font-size:30px;font-weight:700;letter-spacing:-1px}
+.health-num .l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.health-info h3{font-size:14px;font-weight:600;margin-bottom:6px}
+.health-info p{font-size:12px;color:var(--muted);line-height:1.6}
+.health-stats{display:flex;gap:24px}
+.hstat{text-align:center}
+.hstat .v{font-size:18px;font-weight:700}
+.hstat .l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
+
+/* Stats row */
+.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.stat-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px}
+.stat-v{font-size:20px;font-weight:700;letter-spacing:-.5px}
+.stat-s{font-size:10px;color:var(--muted);margin-top:3px}
+
+/* Sec label */
+.sec-l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;
+  color:var(--muted);margin:24px 0 12px}
+
+/* Issue summary chart */
+.preview-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-bottom:20px}
+.preview-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.preview-card h4{font-size:11px;font-weight:600;margin-bottom:14px}
+.chart-wrap{position:relative;height:240px}
+
+/* Issues panel */
+.issues-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto}
+.issues-list::-webkit-scrollbar{width:4px}
+.issues-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.issue-row{display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--surface);
+  border-radius:8px;font-size:11px;border-left:3px solid var(--blue)}
+.issue-row.high{border-left-color:var(--red)}
+.issue-row.medium{border-left-color:var(--amber)}
+.issue-row.low{border-left-color:var(--green)}
+.issue-col{flex:1;font-weight:600;font-size:11px}
+.issue-msg{flex:2;color:var(--muted);font-size:10px}
+.issue-cnt{font-family:var(--mono);font-size:10px;color:var(--text)}
+
+/* Sample table */
+.sample-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:20px}
+.sample-card h4{font-size:11px;font-weight:600;margin-bottom:14px}
+.sample-wrap{overflow:auto;max-height:280px}
+.sample-wrap::-webkit-scrollbar{width:4px;height:4px}
+.sample-wrap::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.sample-table{border-collapse:collapse;font-size:11px;white-space:nowrap}
+.sample-table th{text-align:left;padding:8px 12px;font-size:9px;color:var(--muted);
+  font-weight:500;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);
+  text-transform:uppercase;letter-spacing:.5px}
+.sample-table td{padding:6px 12px;border-bottom:1px solid var(--surface);max-width:200px;
+  overflow:hidden;text-overflow:ellipsis}
+.sample-table tr:hover td{background:#eef2ff}
+.null-cell{color:var(--border2);font-style:italic;font-size:10px}
+
+/* ── STEP 3: CONFIGURE RULES ── */
+.config-intro{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:18px 22px;margin-bottom:20px;display:flex;gap:16px;align-items:flex-start}
+.config-intro-icon{font-size:24px;flex-shrink:0}
+.config-intro h3{font-size:13px;font-weight:600;margin-bottom:5px}
+.config-intro p{font-size:12px;color:var(--muted);line-height:1.6}
+
+.col-tile{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:18px;margin-bottom:10px}
+.col-tile.has-issues{border-color:#f59e0b55}
+.col-tile.clean{border-color:#10b98140;background:#effaf4}
+.col-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;
+  flex-wrap:wrap;gap:8px}
+.col-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px}
+.col-tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{display:inline-block;padding:2px 7px;border-radius:5px;font-size:9px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.3px}
+.tag.type{background:#3d63fb1c;color:var(--blue);border:1px solid #3d63fb40}
+.tag.sens.PII{background:#ef44441c;color:var(--red);border:1px solid #ef444440}
+.tag.sens.Financial{background:#f59e0b1c;color:var(--amber);border:1px solid #f59e0b40}
+.tag.sens.Public{background:#10b9811c;color:var(--green);border:1px solid #10b98140}
+.tag.sens.Internal{background:#3d63fb1c;color:var(--blue);border:1px solid #3d63fb40}
+.tag.complete{background:#10b9811c;color:var(--green);border:1px solid #10b98140}
+.tag.problem{background:#ef44441c;color:var(--red);border:1px solid #ef444440}
+
+.col-meta{display:flex;gap:18px;font-size:11px;color:var(--muted);margin-bottom:12px;
+  flex-wrap:wrap}
+.col-meta span{display:flex;align-items:center;gap:5px}
+.col-meta b{color:var(--text);font-family:var(--mono)}
+.col-samples{font-size:11px;color:var(--muted);margin-bottom:12px}
+.col-samples b{color:var(--text);font-family:var(--mono);background:var(--surface);
+  padding:2px 6px;border-radius:4px;margin-right:6px}
+
+.col-issues{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.col-issue{padding:8px 11px;background:var(--surface);border-radius:6px;font-size:11px;
+  border-left:3px solid var(--amber);display:flex;justify-content:space-between;gap:10px}
+.col-issue.high{border-left-color:var(--red)}
+.col-issue.medium{border-left-color:var(--amber)}
+.col-issue.low{border-left-color:var(--green)}
+.ci-msg{color:var(--text)}
+.ci-cnt{font-family:var(--mono);color:var(--muted)}
+
+.rule-picker{display:flex;flex-direction:column;gap:8px;padding-top:8px;
+  border-top:1px solid var(--border)}
+.rule-picker-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;
+  margin-bottom:4px;font-weight:600}
+.rule-opt{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:7px;
+  background:var(--surface);border:1px solid transparent;cursor:pointer;transition:.15s}
+.rule-opt:hover{border-color:var(--border2)}
+.rule-opt.selected{background:#eaf0ff;border-color:var(--blue)}
+.rule-opt input{accent-color:var(--blue);cursor:pointer}
+.rule-opt label{flex:1;font-size:12px;cursor:pointer}
+
+.col-clean-msg{text-align:center;color:var(--green);font-size:12px;padding:8px 0}
+
+/* Global rules */
+.global-rules{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:18px;margin-bottom:20px}
+.global-rules h4{font-size:12px;font-weight:600;margin-bottom:12px}
+.global-rule{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:7px;
+  background:var(--surface);margin-bottom:6px;cursor:pointer}
+.global-rule input{accent-color:var(--blue)}
+.global-rule label{flex:1;font-size:12px;cursor:pointer}
+.global-rule .rule-count{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+/* Apply bar */
+.apply-bar{position:sticky;bottom:16px;background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(241,244,253,.9));
+  border:1px solid var(--border2);border-radius:12px;padding:14px 20px;display:flex;
+  align-items:center;justify-content:space-between;backdrop-filter:blur(10px);margin-top:16px;
+  box-shadow:0 8px 32px rgba(31,41,75,.14)}
+.apply-summary{font-size:12px;color:var(--muted)}
+.apply-summary b{color:var(--text)}
+
+/* ── STEP 4: RESULTS ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
+  position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--c,var(--blue))}
+.kpi-l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:7px}
+.kpi-v{font-size:22px;font-weight:700;color:var(--c,var(--text));letter-spacing:-.8px}
+.kpi-s{font-size:10px;color:var(--muted);margin-top:4px}
+
+.compare-card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;margin-bottom:14px}
+.compare-card h4{font-size:11px;font-weight:600;margin-bottom:14px}
+.compare-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:center}
+.compare-side{text-align:center}
+.compare-side .title{font-size:10px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.7px;margin-bottom:8px}
+.compare-num{font-size:32px;font-weight:700;letter-spacing:-1px}
+.compare-side.before .compare-num{color:var(--amber)}
+.compare-side.after  .compare-num{color:var(--green)}
+.compare-side .sub{font-size:11px;color:var(--muted);margin-top:4px}
+.compare-arrow{font-size:24px;color:var(--blue);text-align:center}
+
+.charts-row{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-bottom:14px}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.chart-card h4{font-size:11px;font-weight:600;margin-bottom:14px}
+
+.changes-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px}
+.changes-card h4{font-size:11px;font-weight:600;margin-bottom:12px}
+.change-row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:8px 11px;background:var(--surface);
+  border-radius:6px;margin-bottom:5px;font-size:12px;align-items:center}
+.change-col{font-weight:600}
+.change-list{font-family:var(--mono);font-size:10px;color:var(--muted)}
+
+.clean-preview-card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:18px;margin-bottom:20px}
+.clean-preview-card h4{font-size:11px;font-weight:600;margin-bottom:12px;display:flex;
+  align-items:center;justify-content:space-between}
+.clean-preview-card h4 span{font-size:10px;color:var(--muted);font-family:var(--mono);font-weight:400}
+
+/* Download box */
+.download-box{background:linear-gradient(135deg,#10b98122,#3d63fb22);
+  border:1px solid #10b98144;border-radius:12px;padding:20px 24px;display:flex;
+  align-items:center;justify-content:space-between;gap:20px;margin-bottom:20px}
+.download-info h3{font-size:15px;font-weight:600;margin-bottom:5px}
+.download-info p{font-size:12px;color:var(--muted)}
+.btn-dl{background:linear-gradient(135deg,var(--green),var(--teal));border:none;color:#fff;
+  font-weight:700;padding:12px 24px;font-size:12px;cursor:pointer;text-decoration:none;display:inline-block;
+  font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  box-shadow:0 0 24px rgba(10,166,194,.3);transition:.2s}
+.btn-dl:hover{box-shadow:0 0 36px rgba(10,166,194,.45);transform:translateY(-1px)}
+
+/* ── Techy global overrides: glass cards + glow ── */
+.health-card,.stat,.preview-card,.sample-card,.config-intro,.col-tile,.global-rules,
+.kpi,.compare-card,.chart-card,.changes-card,.clean-preview-card{
+  background:linear-gradient(165deg,var(--card2),var(--card))!important;
+  border:1px solid var(--border);backdrop-filter:blur(8px);
+  border-radius:10px;position:relative;transition:border-color .25s,box-shadow .25s,transform .15s}
+.health-card:hover,.stat:hover,.preview-card:hover,.sample-card:hover,.col-tile:hover,
+.kpi:hover,.compare-card:hover,.chart-card:hover,.changes-card:hover,.clean-preview-card:hover{
+  border-color:var(--border2);box-shadow:0 10px 30px rgba(31,41,75,.12),0 0 0 1px rgba(61,99,251,.08)}
+.col-tile.has-issues{border-color:rgba(245,158,11,.35)}
+.col-tile.clean{border-color:rgba(16,185,129,.3);background:linear-gradient(165deg,#f0fbf5,#e9f8f0)!important}
+.tag{font-family:var(--mono)}
+.kpi-v,.compare-num,.stat-v,.health-num .v{font-family:var(--mono)}
+.download-box{box-shadow:0 0 40px rgba(16,185,129,.14);animation:dlGlow 3s ease-in-out infinite}
+@keyframes dlGlow{0%,100%{box-shadow:0 0 24px rgba(16,185,129,.14)}50%{box-shadow:0 0 44px rgba(10,166,194,.22)}}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<!-- Header -->
+<div class="hdr">
+  <div class="brand">
+    <div class="logo">⬡</div>
+    <div>
+      <h1>Adaptive Data Cleaner</h1>
+      <p>Upload → Analyze → Configure → Clean</p>
+    </div>
+  </div>
+  <div class="spill"><div class="sdot" id="sdot"></div><span id="stext">Checking server…</span></div>
+</div>
+
+<!-- Stepper -->
+<div class="stepper">
+  <div class="stp active" id="stp1"><div class="num">1</div><span>Upload</span></div>
+  <div class="stp-sep">→</div>
+  <div class="stp" id="stp2"><div class="num">2</div><span>Analyze</span></div>
+  <div class="stp-sep">→</div>
+  <div class="stp" id="stp3"><div class="num">3</div><span>Configure</span></div>
+  <div class="stp-sep">→</div>
+  <div class="stp" id="stp4"><div class="num">4</div><span>Results</span></div>
+</div>
+
+<div class="main">
+
+<!-- ═══════ STEP 1: UPLOAD ═══════ -->
+<div class="page active" id="page1">
+  <div class="up-hero">
+    <h2>Smart cleaning, on your terms.</h2>
+    <p>Upload any CSV or Excel file. We'll analyze it, show you every problem, and let you choose exactly how each column gets cleaned.</p>
+  </div>
+
+  <div class="feature-chips">
+    <div class="chip">✓ Well-normalised output</div>
+    <div class="chip">✓ Correct formats, types &amp; value ranges</div>
+    <div class="chip">✓ Missing values &amp; anomalies detected</div>
+    <div class="chip">✓ Catches near &amp; full duplicates</div>
+  </div>
+
+  <div class="notice" id="serverNotice" style="display:none">
+    <h3>⚠️ Start the server first</h3>
+    <div style="color:var(--muted);font-size:12px">In your project folder, run:</div>
+    <code>python api_server.py</code>
+  </div>
+
+  <div class="dz" id="dz">
+    <input type="file" id="fi" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm">
+    <span class="dz-icon">📂</span>
+    <div class="dz-title">Drop your CSV or Excel file here</div>
+    <div class="dz-sub">or <b>click to browse</b> · .csv, .tsv, .xlsx, .xls supported</div>
+  </div>
+  <div style="text-align:center">
+    <button class="browse-btn" onclick="document.getElementById('fi').click()">Choose File</button>
+  </div>
+
+  <!-- Trust strip -->
+  <div class="trust-grid">
+    <div class="trust-card">
+      <div class="trust-num">0</div>
+      <div class="trust-label">Sign-ups required</div>
+    </div>
+    <div class="trust-card">
+      <div class="trust-num">&lt;5 min</div>
+      <div class="trust-label">Typical cleaning time</div>
+    </div>
+    <div class="trust-card">
+      <div class="trust-num">Local</div>
+      <div class="trust-label">Runs entirely on your machine</div>
+    </div>
+    <div class="trust-card">
+      <div class="trust-num">Private</div>
+      <div class="trust-label">Your file never leaves your computer</div>
+    </div>
+  </div>
+
+  <!-- What it does -->
+  <div class="info-section">
+    <div class="info-hdr">
+      <span class="info-tag">What It Does</span>
+      <h3>Discover what the cleaning pipeline can do</h3>
+      <p>The engine reads and profiles your spreadsheet column by column, then applies a smart sequence of data-cleansing operations to prepare your file for analysis.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🗂️</div>
+        <h4>Table Structure Detection</h4>
+        <p>Detects the header row, delimiter (comma/tab/semicolon/pipe), and encoding for CSV. For Excel, it unmerges merged cells, folds multi-level headers into one, and splits multiple stacked tables on a sheet — analyzing the largest block.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧬</div>
+        <h4>Type &amp; Schema Normalization</h4>
+        <p>Infers the right data type for every column — text, number, date, email, phone, categorical — using statistical and pattern-based inference.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h4>Data Validation &amp; Fixes</h4>
+        <p>Audits every column for missing values, mixed date formats, invalid emails, and numeric outliers — then applies the fix rule you choose.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧩</div>
+        <h4>Duplicate &amp; Anomaly Detection</h4>
+        <p>Flags fully duplicate rows, <b>near-duplicate rows</b> that only differ by case or whitespace (e.g. "John Smith" vs "john smith "), primary-key collisions, IQR-based numeric outliers, and out-of-range negative values.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="info-section">
+    <div class="info-hdr">
+      <span class="info-tag">How It Works</span>
+      <h3>From messy to tidy, in three steps.</h3>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <h4>Drop your file</h4>
+        <p>Upload a CSV or Excel file. No account, no install — just drag and drop.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <h4>The engine cleans it</h4>
+        <p>Structure detection, normalization, validation, and rule-based fixes run automatically per your choices.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <h4>Get it back</h4>
+        <p>Download a clean, well-structured CSV instantly, plus a full before/after report.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ STEP 2: ANALYSIS ═══════ -->
+<div class="page" id="page2">
+  <div id="analyzingView" class="analyzing">
+    <div class="spinner"></div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px">Analyzing your data…</div>
+    <div style="font-size:12px;color:var(--muted);font-family:'Consolas',monospace" id="analyzingFile"></div>
+  </div>
+
+  <div id="analysisView" style="display:none">
+    <div class="section-hdr">
+      <div>
+        <h2>Analysis Report</h2>
+        <p id="analysisFile"></p>
+      </div>
+      <div class="section-actions">
+        <button class="btn" onclick="goToStep(1)">↩ New File</button>
+        <button class="btn" onclick="autoApplyRecommended()">⚡ Auto-Fix (Recommended)</button>
+        <button class="btn-primary btn" onclick="goToStep(3)">Configure Cleaning →</button>
+      </div>
+    </div>
+
+    <!-- Health score card -->
+    <div class="health-card">
+      <div class="health-circle">
+        <svg viewBox="0 0 120 120" width="120" height="120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e7f7" stroke-width="10"/>
+          <circle id="healthArc" cx="60" cy="60" r="50" fill="none" stroke="#3d63fb" stroke-width="10"
+            stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314"
+            transform="rotate(-90 60 60)" style="transition:stroke-dashoffset 1.2s ease,stroke 1.2s ease"/>
+        </svg>
+        <div class="health-num"><div class="v" id="healthScore">—</div><div class="l">Data Health</div></div>
+      </div>
+      <div class="health-info">
+        <h3 id="healthVerdict">—</h3>
+        <p id="healthSummary">—</p>
+      </div>
+      <div class="health-stats">
+        <div class="hstat"><div class="v" id="hsTotalIssues" style="color:var(--amber)">—</div><div class="l">Total Issues</div></div>
+        <div class="hstat"><div class="v" id="hsAffected"   style="color:var(--red)">—</div><div class="l">Affected Cols</div></div>
+        <div class="hstat"><div class="v" id="hsClean"      style="color:var(--green)">—</div><div class="l">Clean Cols</div></div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="statsRow"></div>
+
+    <!-- Issue summary & chart -->
+    <div class="preview-grid">
+      <div class="preview-card">
+        <h4>📊 Column Completeness</h4>
+        <div class="chart-wrap"><canvas id="compChart"></canvas></div>
+      </div>
+      <div class="preview-card">
+        <h4>⚠️ Top Issues Found</h4>
+        <div class="issues-list" id="issuesList"></div>
+      </div>
+    </div>
+
+    <!-- Raw sample preview -->
+    <div class="sample-card">
+      <h4>👁 First 5 Rows (Raw)</h4>
+      <div class="sample-wrap">
+        <table class="sample-table" id="sampleTable"></table>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:8px 0 20px">
+      <button class="btn-primary btn" onclick="goToStep(3)" style="font-size:14px;padding:12px 28px">
+        Configure Cleaning Rules →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ STEP 3: CONFIGURE ═══════ -->
+<div class="page" id="page3">
+  <div class="section-hdr">
+    <div>
+      <h2>Configure Cleaning Rules</h2>
+      <p>Pick how each problem should be fixed</p>
+    </div>
+    <div class="section-actions">
+      <button class="btn" onclick="goToStep(2)">← Back</button>
+      <button class="btn" onclick="resetToDefaults()">↻ Reset to Recommended</button>
+    </div>
+  </div>
+
+  <div class="config-intro">
+    <span class="config-intro-icon">💡</span>
+    <div>
+      <h3>How this works</h3>
+      <p>Each column below shows the problems we found. You pick what to do about each one. Defaults are pre-selected based on best practices — change any you disagree with, then hit Apply.</p>
+    </div>
+  </div>
+
+  <!-- Global rules -->
+  <div class="global-rules" id="globalRulesPanel"></div>
+
+  <!-- Per-column rules -->
+  <div id="columnRules"></div>
+
+  <!-- Apply bar -->
+  <div class="apply-bar">
+    <div class="apply-summary" id="applySummary">
+      <b id="rulesSelected">0</b> rules selected
+    </div>
+    <button class="btn-primary btn" id="applyBtn" onclick="applyCleaning()" style="font-size:13px;padding:11px 24px">
+      Apply Cleaning &amp; Generate Dashboard →
+    </button>
+  </div>
+</div>
+
+<!-- ═══════ STEP 4: RESULTS ═══════ -->
+<div class="page" id="page4">
+  <div id="cleaningView" class="analyzing" style="display:none">
+    <div class="spinner"></div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px">Cleaning your data…</div>
+    <div style="font-size:12px;color:var(--muted);font-family:'Consolas',monospace" id="cleaningStatus">Applying rules…</div>
+  </div>
+
+  <div id="resultsView" style="display:none">
+    <div class="section-hdr">
+      <div>
+        <h2>Cleaning Complete ✦</h2>
+        <p id="resultsFile"></p>
+      </div>
+      <div class="section-actions">
+        <button class="btn" onclick="goToStep(1)">↩ Process Another File</button>
+      </div>
+    </div>
+
+    <!-- Download box -->
+    <div class="download-box">
+      <div class="download-info">
+        <h3>✅ Your cleaned file is ready</h3>
+        <p id="dlInfo">—</p>
+      </div>
+      <a class="btn-dl" id="dlBtn" href="#" download>⬇ Download Clean CSV</a>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <!-- Before/After comparison -->
+    <div class="compare-card">
+      <h4>📊 Before vs After</h4>
+      <div class="compare-grid">
+        <div class="compare-side before">
+          <div class="title">Before Cleaning</div>
+          <div class="compare-num" id="beforeRows">—</div>
+          <div class="sub">rows · <span id="beforeNulls">—</span> nulls</div>
+        </div>
+        <div class="compare-arrow">→</div>
+        <div class="compare-side after">
+          <div class="title">After Cleaning</div>
+          <div class="compare-num" id="afterRows">—</div>
+          <div class="sub">rows · <span id="afterNulls">—</span> nulls</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <h4>📈 Completeness: Before vs After</h4>
+        <div class="chart-wrap"><canvas id="compareChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h4>📊 Operations Summary</h4>
+        <div class="chart-wrap"><canvas id="opsChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Detailed changes -->
+    <div class="changes-card">
+      <h4>🔧 What Changed Per Column</h4>
+      <div id="changesList"></div>
+    </div>
+
+    <!-- Clean data preview -->
+    <div class="clean-preview-card">
+      <h4>✅ Cleaned Data Preview <span id="prevCount"></span></h4>
+      <div class="sample-wrap">
+        <table class="sample-table" id="cleanTable"></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div> <!-- main -->
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+const API = 'http://localhost:7432';
+let analysisReport = null;
+let cleaningResult = null;
+let serverOn = false;
+let chartComp = null, chartCompare = null, chartOps = null;
+Chart.defaults.color = '#5b6386';
+Chart.defaults.borderColor = '#e2e7f7';
+
+// ── Server check ─────────────────────────────────────────────────────────────
+async function checkServer() {
+  try {
+    const r = await fetch(`${API}/status`, {signal:AbortSignal.timeout(2000)});
+    if (r.ok) {
+      serverOn = true;
+      document.getElementById('sdot').classList.add('on');
+      document.getElementById('stext').textContent = 'Server connected · :7432';
+      document.getElementById('serverNotice').style.display = 'none';
+      return true;
+    }
+  } catch(e) {}
+  serverOn = false;
+  document.getElementById('sdot').classList.remove('on');
+  document.getElementById('stext').textContent = 'Server offline';
+  document.getElementById('serverNotice').style.display = 'block';
+  return false;
+}
+checkServer();
+setInterval(checkServer, 10000);
+
+// ── Stepper navigation ───────────────────────────────────────────────────────
+function goToStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const stp = document.getElementById(`stp${i}`);
+    const pg  = document.getElementById(`page${i}`);
+    pg.classList.toggle('active', i === n);
+    stp.classList.toggle('active', i === n);
+    stp.classList.toggle('done',   i < n);
+  }
+  window.scrollTo(0, 0);
+}
+
+// ── Drag & drop ──────────────────────────────────────────────────────────────
+const dz = document.getElementById('dz');
+const fi = document.getElementById('fi');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fi.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+// ── Step 1 → 2: Upload & analyze ─────────────────────────────────────────────
+async function handleFile(file) {
+  if (!serverOn) {
+    const ok = await checkServer();
+    if (!ok) {
+      alert('⚠️  Server not running.\n\nIn your project folder, run:\n  python api_server.py\n\nThen try again.');
+      return;
+    }
+  }
+  goToStep(2);
+  document.getElementById('analyzingView').style.display = 'block';
+  document.getElementById('analysisView').style.display = 'none';
+  document.getElementById('analyzingFile').textContent = `${file.name} · ${(file.size/1024).toFixed(1)} KB`;
+
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+
+  try {
+    const r = await fetch(`${API}/analyze`, { method:'POST', body:fd });
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.error || 'Analysis failed');
+    }
+    const report = await r.json();
+    analysisReport = report;
+    renderAnalysis(report);
+  } catch(e) {
+    document.getElementById('analyzingView').innerHTML = `
+      <div style="font-size:48px;margin-bottom:16px">❌</div>
+      <div style="font-size:15px;color:var(--red);margin-bottom:8px">Analysis failed</div>
+      <div style="font-size:12px;color:var(--muted)">${e.message}</div>
+      <button class="btn" onclick="goToStep(1)" style="margin-top:24px">↩ Try Another File</button>`;
+  }
+}
+
+// ── Render analysis ──────────────────────────────────────────────────────────
+function renderAnalysis(r) {
+  document.getElementById('analyzingView').style.display = 'none';
+  document.getElementById('analysisView').style.display = 'block';
+
+  let fileLine = `${r.filename} · ${r.total_rows.toLocaleString()} rows · ${r.total_cols} columns · ${r.delimiter}-delimited · ${r.encoding||'utf-8'}`;
+  if (r.excel_structure) {
+    const es = r.excel_structure;
+    const bits = [];
+    if (es.tables_detected > 1) bits.push(`${es.tables_detected} table blocks found (largest analyzed)`);
+    if (es.merged_cells_filled > 0) bits.push(`${es.merged_cells_filled} merged cells unmerged`);
+    if (es.multi_level_header) bits.push(`multi-level header folded`);
+    if (bits.length) fileLine += ' · ' + bits.join(' · ');
+  }
+  document.getElementById('analysisFile').textContent = fileLine;
+
+  // Health score
+  const h = r.stats.health_score;
+  document.getElementById('healthScore').textContent = h + '%';
+  document.getElementById('hsTotalIssues').textContent = r.stats.total_issues;
+  document.getElementById('hsAffected').textContent = r.stats.affected_cols;
+  document.getElementById('hsClean').textContent = r.stats.clean_cols;
+
+  // Health arc
+  const arc = document.getElementById('healthArc');
+  arc.style.strokeDashoffset = 314 - (314 * h / 100);
+  const color = h >= 90 ? '#10b981' : h >= 70 ? '#f59e0b' : '#ef4444';
+  arc.style.stroke = color;
+  document.getElementById('healthScore').style.color = color;
+
+  // Verdict
+  let verdict, summary;
+  if (r.stats.total_issues === 0) {
+    verdict = '✦ Your data is already clean';
+    summary = `All ${r.total_cols} columns passed quality checks. You can still apply cleaning rules below if you want.`;
+  } else if (h >= 85) {
+    verdict = '✅ Minor issues found';
+    summary = `Your data is in good shape. ${r.stats.total_issues} issues found across ${r.stats.affected_cols} columns — mostly minor. Quick to clean.`;
+  } else if (h >= 65) {
+    verdict = '⚠️ Some cleaning needed';
+    summary = `Found ${r.stats.total_issues} issues in ${r.stats.affected_cols} of ${r.total_cols} columns. Review each column's recommended rule below.`;
+  } else {
+    verdict = '🔴 Significant cleaning needed';
+    summary = `${r.stats.total_issues} quality issues across ${r.stats.affected_cols} columns. Careful rule selection recommended.`;
+  }
+  document.getElementById('healthVerdict').textContent = verdict;
+  document.getElementById('healthSummary').textContent = summary;
+
+  // Stats row
+  const stats = [
+    {l:'Total Rows',    v:r.total_rows.toLocaleString(),    s:`${r.total_cols} columns`},
+    {l:'Avg Completeness', v:r.stats.avg_completeness.toFixed(1)+'%', s:'across all columns'},
+    {l:'Duplicate Rows', v:r.fully_duplicate_rows.toLocaleString(), s:'fully identical rows'},
+    {l:'Near Duplicates', v:(r.near_duplicate_rows||0).toLocaleString(), s:'case/whitespace variants'},
+    {l:'PII Columns',    v:r.stats.pii_columns,             s:'sensitive data detected'},
+    {l:'Primary Key',    v:r.suggested_primary_key || '—',   s:r.suggested_primary_key ? 'auto-detected':'none found', truncate:true},
+  ];
+  document.getElementById('statsRow').innerHTML = stats.map(s =>
+    `<div class="stat">
+      <div class="stat-l">${s.l}</div>
+      <div class="stat-v"${s.truncate?' style="font-size:14px"':''}>${s.v}</div>
+      <div class="stat-s">${s.s}</div>
+    </div>`).join('');
+
+  // Completeness chart
+  const cols = r.columns.slice(0, 18);
+  const labels = cols.map(c => c.name.length > 12 ? c.name.slice(0,12)+'…' : c.name);
+  const vals = cols.map(c => c.completeness);
+  const bgs = vals.map(v => v>=95?'#10b98199':v>=80?'#f59e0b99':'#ef444499');
+  const brs = vals.map(v => v>=95?'#10b981':v>=80?'#f59e0b':'#ef4444');
+  if (chartComp) chartComp.destroy();
+  chartComp = new Chart(document.getElementById('compChart'), {
+    type:'bar',
+    data:{labels, datasets:[{label:'Completeness %', data:vals,
+      backgroundColor:bgs, borderColor:brs, borderWidth:1}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{x:{min:0,max:100,grid:{color:'#e2e7f790'},ticks:{font:{size:9},callback:v=>v+'%'}},
+              y:{grid:{display:false},ticks:{font:{size:9}}}}}
+  });
+
+  // Top issues
+  const allIssues = [];
+  r.columns.forEach(c => c.issues.forEach(i =>
+    allIssues.push({col:c.name, ...i})));
+  allIssues.sort((a,b) => ({high:0,medium:1,low:2}[a.severity] - {high:0,medium:1,low:2}[b.severity]));
+  if (allIssues.length === 0) {
+    document.getElementById('issuesList').innerHTML =
+      `<div style="text-align:center;color:var(--green);padding:60px 0;font-size:13px">
+        ✦ No issues found — your data is clean!
+      </div>`;
+  } else {
+    document.getElementById('issuesList').innerHTML = allIssues.slice(0,12).map(i =>
+      `<div class="issue-row ${i.severity}">
+        <span class="issue-col">${i.col}</span>
+        <span class="issue-msg">${i.message}</span>
+        <span class="issue-cnt">${i.count.toLocaleString()}</span>
+      </div>`).join('');
+  }
+
+  // Sample preview
+  const previewRows = r.preview_rows || [];
+  const allHeaders = r.columns.map(c => c.name).slice(0, 8);
+  let html = `<thead><tr>${allHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  html += previewRows.slice(0, 5).map(row =>
+    `<tr>${allHeaders.map(h => {
+      const v = row[h];
+      if (v === '' || v === null || v === undefined) return `<td class="null-cell">null</td>`;
+      const str = String(v);
+      return `<td>${str.length > 30 ? str.slice(0,30)+'…' : str}</td>`;
+    }).join('')}</tr>`).join('');
+  html += '</tbody>';
+  document.getElementById('sampleTable').innerHTML = html;
+
+  // Pre-build the rule config UI
+  buildConfigUI(r);
+}
+
+// ── Step 3: Configure rules UI ───────────────────────────────────────────────
+function buildConfigUI(r) {
+  // Global rules
+  const gPanel = document.getElementById('globalRulesPanel');
+  let gHtml = '<h4>🌐 Global Rules (applied to whole dataset)</h4>';
+  if (r.recommended_rules.length === 0) {
+    gHtml += '<div style="color:var(--muted);font-size:12px;padding:8px 0">No global cleaning needed.</div>';
+  } else {
+    r.recommended_rules.forEach(g => {
+      const id = `g-${g.rule}`;
+      gHtml += `<div class="global-rule" onclick="toggleGlobal('${g.rule}', this)">
+        <input type="checkbox" id="${id}" ${g.default?'checked':''}>
+        <label for="${id}">${g.label}</label>
+      </div>`;
+    });
+  }
+  gPanel.innerHTML = gHtml;
+
+  // Per-column rules
+  let cHtml = '';
+  r.columns.forEach(c => {
+    const hasIssues = c.issue_count > 0;
+    cHtml += `<div class="col-tile ${hasIssues?'has-issues':'clean'}">
+      <div class="col-head">
+        <div class="col-name">${c.name}</div>
+        <div class="col-tags">
+          <span class="tag type">${c.inferred_type}</span>
+          <span class="tag sens ${c.sensitivity}">${c.sensitivity}</span>
+          ${c.is_pii?'<span class="tag sens PII">PII</span>':''}
+          ${hasIssues
+            ? `<span class="tag problem">${c.issue_count} issue${c.issue_count>1?'s':''}</span>`
+            : '<span class="tag complete">clean</span>'}
+        </div>
+      </div>
+
+      <div class="col-meta">
+        <span>Rows: <b>${(c.null_count + (r.total_rows - c.null_count)).toLocaleString()}</b></span>
+        <span>Nulls: <b>${c.null_count.toLocaleString()} (${c.null_pct}%)</b></span>
+        <span>Unique: <b>${c.unique_count.toLocaleString()}</b></span>
+        <span>Completeness: <b>${c.completeness}%</b></span>
+      </div>
+
+      <div class="col-samples">Samples: ${c.samples.slice(0,4).map(s => `<b>${escapeHtml(String(s))}</b>`).join('')}</div>
+
+      ${hasIssues ? `
+        <div class="col-issues">
+          ${c.issues.map(i => `
+            <div class="col-issue ${i.severity}">
+              <span class="ci-msg">${i.message}</span>
+              <span class="ci-cnt">${i.count.toLocaleString()}</span>
+            </div>`).join('')}
+        </div>
+
+        <div class="rule-picker" data-col="${escapeHtml(c.name)}">
+          <div class="rule-picker-label">Choose how to fix:</div>
+          ${c.suggestions.map((s, i) => {
+            const isDefault = s.default || (i === 0 && !c.suggestions.some(x => x.default));
+            return `<div class="rule-opt ${isDefault?'selected':''}" onclick="pickRule('${c.name}', '${s.action}', this)">
+              <input type="radio" name="rule-${c.name}" value="${s.action}" ${isDefault?'checked':''}>
+              <label>${s.label}</label>
+            </div>`;
+          }).join('')}
+          <button class="btn" style="font-size:10px;padding:5px 10px;margin-top:6px;align-self:flex-start"
+            onclick="event.stopPropagation(); applyToAllColumns('${c.name}', this)">⇉ Apply this choice to all other columns</button>
+        </div>
+      ` : '<div class="col-clean-msg">✓ No issues — no cleaning needed</div>'}
+    </div>`;
+  });
+  document.getElementById('columnRules').innerHTML = cHtml;
+
+  updateRulesCount();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function pickRule(col, action, el) {
+  el.parentElement.querySelectorAll('.rule-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  el.querySelector('input').checked = true;
+  updateRulesCount();
+}
+
+function toggleGlobal(rule, el) {
+  const cb = el.querySelector('input');
+  cb.checked = !cb.checked;
+  updateRulesCount();
+}
+
+function applyToAllColumns(sourceCol, btnEl) {
+  const sourcePicker = document.querySelector(`.rule-picker[data-col="${cssEscape(sourceCol)}"]`);
+  if (!sourcePicker) return;
+  const checked = sourcePicker.querySelector('input[type=radio]:checked');
+  if (!checked) return;
+  const action = checked.value;
+
+  let applied = 0;
+  document.querySelectorAll('.rule-picker').forEach(picker => {
+    if (picker.dataset.col === sourceCol) return;
+    const match = Array.from(picker.querySelectorAll('input[type=radio]')).find(r => r.value === action);
+    if (!match) return;
+    picker.querySelectorAll('.rule-opt').forEach(o => o.classList.remove('selected'));
+    match.checked = true;
+    match.closest('.rule-opt').classList.add('selected');
+    applied++;
+  });
+
+  updateRulesCount();
+  if (btnEl) {
+    const orig = btnEl.textContent;
+    btnEl.textContent = applied > 0 ? `✓ Applied to ${applied} column${applied>1?'s':''}` : 'No matching columns';
+    setTimeout(() => { btnEl.textContent = orig; }, 1800);
+  }
+}
+
+function cssEscape(s) {
+  return window.CSS && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&');
+}
+
+function updateRulesCount() {
+  const global = document.querySelectorAll('.global-rule input:checked').length;
+  const cols   = document.querySelectorAll('.rule-opt.selected input:checked').length;
+  document.getElementById('rulesSelected').textContent = global + cols;
+  document.getElementById('applySummary').innerHTML =
+    `<b>${global + cols}</b> rules selected — <b>${global}</b> global, <b>${cols}</b> column-specific`;
+}
+
+function resetToDefaults() {
+  if (analysisReport) buildConfigUI(analysisReport);
+}
+
+// ── Step 3 → 4: Apply cleaning ───────────────────────────────────────────────
+async function applyCleaning() {
+  // Build rules payload
+  const rules = { global: {}, columns: {} };
+
+  document.querySelectorAll('.global-rule input:checked').forEach(cb => {
+    const id = cb.id.replace('g-', '');
+    rules.global[id] = true;
+  });
+
+  document.querySelectorAll('.rule-opt.selected input:checked').forEach(rb => {
+    const col = rb.name.replace('rule-', '');
+    rules.columns[col] = { action: rb.value };
+  });
+
+  await runCleaning(rules);
+}
+
+// ── Auto-Fix: pick the recommended/default rule for every detected issue ─────
+function buildRecommendedRules(r) {
+  const rules = { global: {}, columns: {} };
+  r.recommended_rules.forEach(g => {
+    if (g.default) rules.global[g.rule] = true;
+  });
+  r.columns.forEach(c => {
+    if (c.issue_count > 0 && c.suggestions && c.suggestions.length) {
+      const def = c.suggestions.find(s => s.default) || c.suggestions[0];
+      rules.columns[c.name] = { action: def.action };
+    }
+  });
+  return rules;
+}
+
+async function autoApplyRecommended() {
+  if (!analysisReport) return;
+  await runCleaning(buildRecommendedRules(analysisReport));
+}
+
+// ── Shared: send rules to the server and move to results ────────────────────
+async function runCleaning(rules) {
+  goToStep(4);
+  document.getElementById('cleaningView').style.display = 'block';
+  document.getElementById('resultsView').style.display = 'none';
+  document.getElementById('cleaningStatus').textContent =
+    `Applying ${Object.keys(rules.columns).length} column rules · ${Object.keys(rules.global).length} global rules…`;
+
+  try {
+    const r = await fetch(`${API}/clean`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        upload_path: analysisReport._upload_path,
+        report:      analysisReport,
+        rules:       rules,
+      })
+    });
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.error || 'Cleaning failed');
+    }
+    const result = await r.json();
+    cleaningResult = result;
+    renderResults(result);
+  } catch(e) {
+    document.getElementById('cleaningView').innerHTML = `
+      <div style="font-size:48px;margin-bottom:16px">❌</div>
+      <div style="font-size:15px;color:var(--red);margin-bottom:8px">Cleaning failed</div>
+      <div style="font-size:12px;color:var(--muted)">${e.message}</div>
+      <button class="btn" onclick="goToStep(3)" style="margin-top:24px">← Back to Rules</button>`;
+  }
+}
+
+// ── Render results ───────────────────────────────────────────────────────────
+function renderResults(r) {
+  document.getElementById('cleaningView').style.display = 'none';
+  document.getElementById('resultsView').style.display = 'block';
+
+  document.getElementById('resultsFile').textContent =
+    `${r.filename} · ${r.elapsed_sec}s · saved to ${r.output_basename}`;
+
+  // Download
+  document.getElementById('dlBtn').href = `${API}/download/${encodeURIComponent(r.output_basename)}`;
+  document.getElementById('dlBtn').setAttribute('download', r.output_basename);
+  document.getElementById('dlInfo').textContent =
+    `${r.cleaned_rows.toLocaleString()} clean rows · saved in data/processed/ · also stored in db/warehouse.db (table: ${r.table_name})`;
+
+  // KPIs
+  const kpis = [
+    {l:'Rows Cleaned',   v:r.cleaned_rows.toLocaleString(),    s:`from ${r.original_rows.toLocaleString()} original`, c:'var(--blue)'},
+    {l:'Rows Removed',   v:r.rows_dropped.toLocaleString(),    s:'dupes, invalid, dropped', c:'var(--amber)'},
+    {l:'Nulls Resolved', v:r.nulls_resolved.toLocaleString(),  s:`${r.original_nulls} → ${r.cleaned_nulls}`, c:'var(--green)'},
+    {l:'Poor Quality',   v:r.poor_rows.toLocaleString(),       s:'rows with >30% nulls', c:'var(--red)'},
+    {l:'Processing Time', v:r.elapsed_sec+'s',                  s:'end to end', c:'var(--teal)'},
+  ];
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k =>
+    `<div class="kpi" style="--c:${k.c}">
+      <div class="kpi-l">${k.l}</div>
+      <div class="kpi-v">${k.v}</div>
+      <div class="kpi-s">${k.s}</div>
+    </div>`).join('');
+
+  // Before/After
+  document.getElementById('beforeRows').textContent  = r.original_rows.toLocaleString();
+  document.getElementById('afterRows').textContent   = r.cleaned_rows.toLocaleString();
+  document.getElementById('beforeNulls').textContent = r.original_nulls.toLocaleString();
+  document.getElementById('afterNulls').textContent  = r.cleaned_nulls.toLocaleString();
+
+  // Compare chart (before vs after completeness per col)
+  const cols = analysisReport.columns.slice(0, 14);
+  const labels = cols.map(c => c.name.length > 10 ? c.name.slice(0,10)+'…' : c.name);
+  const before = cols.map(c => c.completeness);
+  const after  = cols.map(c => (r.col_after[c.name] || {}).completeness || 100);
+
+  if (chartCompare) chartCompare.destroy();
+  chartCompare = new Chart(document.getElementById('compareChart'), {
+    type:'bar',
+    data:{labels, datasets:[
+      {label:'Before', data:before, backgroundColor:'#f59e0b88', borderColor:'#f59e0b', borderWidth:1},
+      {label:'After',  data:after,  backgroundColor:'#10b98188', borderColor:'#10b981', borderWidth:1},
+    ]},
+    options:{responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{legend:{position:'top', labels:{boxWidth:10, font:{size:10}}}},
+      scales:{x:{min:0,max:100,grid:{color:'#e2e7f790'},ticks:{font:{size:9},callback:v=>v+'%'}},
+              y:{grid:{display:false},ticks:{font:{size:9}}}}}
+  });
+
+  // Operations chart (what kind of changes were made)
+  const opsCounts = { Trimmed:0, Filled:0, Capped:0, Normalized:0, RowsDropped:0, Nulled:0, DatesNormalized:0, AbsApplied:0 };
+  Object.values(r.changes_by_col).forEach(ch => {
+    if (ch.trimmed)            opsCounts.Trimmed         += ch.trimmed;
+    if (ch.filled)             opsCounts.Filled          += ch.filled;
+    if (ch.capped)             opsCounts.Capped          += ch.capped;
+    if (ch.case_normalized)    opsCounts.Normalized      += ch.case_normalized;
+    if (ch.rows_dropped)       opsCounts.RowsDropped     += ch.rows_dropped;
+    if (ch.nulled)             opsCounts.Nulled          += ch.nulled;
+    if (ch.dates_normalized)   opsCounts.DatesNormalized += ch.dates_normalized;
+    if (ch.abs_applied)        opsCounts.AbsApplied      += ch.abs_applied;
+  });
+  const opsLabels = Object.keys(opsCounts).filter(k => opsCounts[k] > 0);
+  const opsData   = opsLabels.map(k => opsCounts[k]);
+  const opsColors = ['#3d63fb','#10b981','#a855f7','#f59e0b','#ef4444','#0aa6c2','#8b3df0','#fb923c'];
+
+  if (chartOps) chartOps.destroy();
+  if (opsLabels.length) {
+    chartOps = new Chart(document.getElementById('opsChart'), {
+      type:'doughnut',
+      data:{labels:opsLabels, datasets:[{data:opsData,
+        backgroundColor:opsColors.slice(0,opsLabels.length).map(c=>c+'88'),
+        borderColor:opsColors.slice(0,opsLabels.length),
+        borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+        plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:9},padding:6}},
+                 tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString()}`}}}}
+    });
+  } else {
+    document.getElementById('opsChart').parentElement.innerHTML =
+      '<div style="text-align:center;color:var(--muted);font-size:12px;padding:60px 0">No transformations applied</div>';
+  }
+
+  // Changes per column
+  const changes = Object.entries(r.changes_by_col).filter(([_, ch]) => Object.keys(ch).length);
+  if (changes.length === 0) {
+    document.getElementById('changesList').innerHTML =
+      '<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0">No transformations were applied to any column.</div>';
+  } else {
+    document.getElementById('changesList').innerHTML = changes.map(([col, ch]) => {
+      const parts = Object.entries(ch).map(([k,v]) =>
+        `${k.replace(/_/g,' ')}: <b>${v.toLocaleString()}</b>`);
+      return `<div class="change-row">
+        <div class="change-col">${col}</div>
+        <div class="change-list">${parts.join(' · ')}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Clean data preview
+  const headers = r.preview_headers || [];
+  const preview = r.preview || [];
+  document.getElementById('prevCount').textContent =
+    `(showing ${preview.length} of ${r.cleaned_rows.toLocaleString()} rows)`;
+  let html = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  html += preview.map(row =>
+    `<tr>${headers.map(h => {
+      const v = row[h];
+      if (v === null || v === undefined || v === '') return `<td class="null-cell">null</td>`;
+      const str = String(v);
+      return `<td>${str.length > 30 ? str.slice(0,30)+'…' : str}</td>`;
+    }).join('')}</tr>`).join('');
+  html += '</tbody>';
+  document.getElementById('cleanTable').innerHTML = html;
+}
+</script>
+</body>
+</html>
